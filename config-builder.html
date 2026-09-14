@@ -38,7 +38,8 @@
 <div class="wrap">
   <h1>WR1800K <code>creds.json</code> builder</h1>
   <p class="sub">Fill in the fields, then download or copy. Feed the result to
-    <code>flash-wr1800k.sh creds.json &lt;wired-iface&gt;</code>.</p>
+    <code>flash-wr1800k.sh creds.json &lt;wired-iface&gt;</code>, or
+    <code>flash-wr1800k.sh creds.json build</code> for the image alone.</p>
 
   <div class="cols">
     <form id="f">
@@ -53,11 +54,12 @@
         <div id="bh-wrap">
           <label>Backhaul <span class="hint">how a bridge reaches the upstream</span></label>
           <select id="backhaul">
-            <option value="relayd">relayd: wireless, works with any router incl. Fios</option>
-            <option value="proxy">proxy: wireless, each client keeps its own MAC (drops relayd)</option>
+            <option value="relayd">relayd: wireless, any router, all hosts share the repeater's MAC upstream</option>
+            <option value="proxy">proxy: wireless, any router, each host keeps its own MAC; 18 clients max</option>
             <option value="wds">wds: wireless 4-address, needs a WDS-capable upstream</option>
             <option value="wired">wired: Ethernet/coax into a LAN port</option>
           </select>
+          <p class="hint" id="bh-hint"></p>
         </div>
       </fieldset>
 
@@ -153,6 +155,12 @@
     $('band-wrap').hidden = !wireless;
     $('main-ssid-wrap').hidden = !(wireless || mode === 'ap');
     $('main-ssid-label').textContent = mode === 'ap' ? 'SSID to broadcast' : 'Upstream SSID to join';
+    $('bh-hint').textContent = {
+      relayd: 'Simplest. Port forwards, Wake-on-LAN, PXE and IPv6 neighbour discovery cannot tell hosts behind the repeater apart.',
+      proxy: 'One station per client on the backhaul radio (pstad). Hosts keep their identity upstream. One association slot per client, 18 on MT7915.',
+      wds: 'Only if the upstream accepts 4-address frames. Most ISP routers do not.',
+      wired: 'A plain layer-2 access point. Use it wherever a cable reaches.'
+    }[backhaul];
 
     var keys = $('ssh_authorized_keys').value.split('\n')
       .map(function (s) { return s.trim(); }).filter(Boolean);

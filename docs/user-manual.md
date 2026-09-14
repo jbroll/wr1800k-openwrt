@@ -27,7 +27,7 @@ generated images, and the script's ephemeral SSH key.
 | Field | Purpose |
 |---|---|
 | `mode` | `ap` (standalone router, default) or `bridge` (extender onto the upstream subnet). See Modes below. |
-| `backhaul` | `bridge` uplink: `relayd` (wireless proxy-ARP, works with any upstream; default), `proxy` (wireless, per-client proxy STA, each client keeps its own MAC upstream, drops relayd), `wds` (wireless 4-address, needs a WDS-capable upstream), or `wired` (Ethernet/coax into a LAN port). |
+| `backhaul` | `bridge` uplink: `relayd` (wireless proxy-ARP, works with any upstream; default), `proxy` (wireless, per-client proxy STA, each client keeps its own MAC upstream, drops relayd, 18 clients per repeater on MT7915), `wds` (wireless 4-address, needs a WDS-capable upstream), or `wired` (Ethernet/coax into a LAN port). |
 | `root_password` | Root login password. Optional if `ssh_authorized_keys` is set; leave `""` to disable password login. |
 | `ssh_authorized_keys` | Array of public keys added to root's `authorized_keys`. Optional if `root_password` is set. At least one of the two is required. |
 | `main_ssid` | In `ap`, the SSID broadcast on both radios. In `bridge` with a wireless backhaul (`relayd`/`wds`/`proxy`), the upstream network to join (and, unless `ap_ssid` is set, the SSID rebroadcast). Not needed for `wired`. |
