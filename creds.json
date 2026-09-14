@@ -1,0 +1,16 @@
+{
+  "mode": "bridge",
+  "backhaul": "relayd",
+  "root_password": "CHANGE-ME-strong-password-or-\"\"-if-using-ssh-keys",
+  "ssh_authorized_keys": [],
+  "main_ssid": "CHANGE-ME-upstream-SSID-to-join",
+  "ap_ssid": "",
+  "wifi_password": "CHANGE-ME-wifi-password-8-plus-chars",
+  "wifi_encryption": "sae-mixed",
+  "backhaul_band": "5",
+  "country": "US",
+  "hostname_prefix": "WR1800K",
+  "lan_ipaddr": "192.168.9.1",
+  "power_off_cmd": "",
+  "power_on_cmd": ""
+}

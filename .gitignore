@@ -1,0 +1,7 @@
+# local credentials (real secrets)
+creds.local.json
+*.local.json
+# ImageBuilder tree, generated images, and the script's ephemeral SSH key
+build/
+# bootloader dumps pulled from real units
+backup/*.bin

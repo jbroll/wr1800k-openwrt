@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WR1800K creds.json builder</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; background: #f6f6f4; color: #1a1a1a; }
+  @media (prefers-color-scheme: dark) { body { background: #16171a; color: #e6e6e6; } }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p.sub { margin: 0 0 24px; opacity: .7; }
+  .cols { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  form { flex: 1 1 380px; }
+  .out { flex: 1 1 300px; position: sticky; top: 16px; }
+  fieldset { border: 1px solid #ccc; border-radius: 8px; margin: 0 0 16px; padding: 12px 14px; }
+  @media (prefers-color-scheme: dark) { fieldset { border-color: #3a3c42; } }
+  legend { font-weight: 600; padding: 0 6px; }
+  label { display: block; margin: 10px 0 2px; font-weight: 500; }
+  .hint { font-weight: 400; opacity: .65; font-size: .85em; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid #bbb;
+    border-radius: 6px; font: inherit; background: #fff; color: #111; }
+  @media (prefers-color-scheme: dark) { input, select, textarea { background: #222429; color: #eee; border-color: #45474d; } }
+  textarea { resize: vertical; min-height: 64px; font-family: ui-monospace, monospace; font-size: .9em; }
+  pre { background: #1e1f24; color: #d6e2ff; padding: 14px; border-radius: 8px; overflow-x: auto;
+    font-family: ui-monospace, monospace; font-size: .82rem; white-space: pre; margin: 0 0 12px; }
+  .row { display: flex; gap: 12px; } .row > div { flex: 1; }
+  button { font: inherit; font-weight: 600; padding: 9px 14px; border: 0; border-radius: 6px; cursor: pointer;
+    background: #2f6fed; color: #fff; margin-right: 8px; }
+  button.sec { background: #666; }
+  .warn { color: #c0392b; font-size: .85em; min-height: 1.2em; margin: 4px 0 0; }
+  @media (prefers-color-scheme: dark) { .warn { color: #ff8a7a; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>WR1800K <code>creds.json</code> builder</h1>
+  <p class="sub">Fill in the fields, then download or copy. Feed the result to
+    <code>flash-wr1800k.sh creds.json &lt;wired-iface&gt;</code>.</p>
+
+  <div class="cols">
+    <form id="f">
+      <fieldset>
+        <legend>Role</legend>
+        <label>Mode</label>
+        <select id="mode">
+          <option value="bridge">bridge: extender onto the upstream subnet</option>
+          <option value="ap">ap: standalone router (bench / isolated)</option>
+        </select>
+
+        <div id="bh-wrap">
+          <label>Backhaul <span class="hint">how a bridge reaches the upstream</span></label>
+          <select id="backhaul">
+            <option value="relayd">relayd: wireless, works with any router incl. Fios</option>
+            <option value="proxy">proxy: wireless, each client keeps its own MAC (drops relayd)</option>
+            <option value="wds">wds: wireless 4-address, needs a WDS-capable upstream</option>
+            <option value="wired">wired: Ethernet/coax into a LAN port</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Login</legend>
+        <label>Root password <span class="hint">blank to disable password login (then a key is required)</span></label>
+        <input id="root_password" type="text" autocomplete="off">
+        <label>Authorized SSH keys <span class="hint">one public key per line</span></label>
+        <textarea id="ssh_authorized_keys" placeholder="ssh-ed25519 AAAA... you@host"></textarea>
+        <p class="warn" id="login-warn"></p>
+      </fieldset>
+
+      <fieldset id="wifi-set">
+        <legend>Wi-Fi</legend>
+        <div id="main-ssid-wrap">
+          <label id="main-ssid-label">Upstream SSID to join</label>
+          <input id="main_ssid" type="text">
+        </div>
+        <label>Broadcast SSID <span class="hint">blank = rebroadcast the upstream SSID; <code>{mac}</code> expands to the unit's MAC suffix</span></label>
+        <input id="ap_ssid" type="text" placeholder="(leave blank for deployment)">
+        <label>Wi-Fi password <span class="hint">8+ characters</span></label>
+        <input id="wifi_password" type="text" autocomplete="off">
+        <p class="warn" id="wifi-warn"></p>
+        <div class="row">
+          <div>
+            <label>Encryption</label>
+            <select id="wifi_encryption">
+              <option value="sae-mixed">sae-mixed (WPA2/WPA3)</option>
+              <option value="psk2">psk2 (WPA2 only)</option>
+            </select>
+          </div>
+          <div id="band-wrap">
+            <label>Backhaul band</label>
+            <select id="backhaul_band">
+              <option value="5">5 GHz</option>
+              <option value="2">2.4 GHz</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>System</legend>
+        <div class="row">
+          <div>
+            <label>Country</label>
+            <input id="country" type="text" value="US">
+          </div>
+          <div>
+            <label>Hostname prefix</label>
+            <input id="hostname_prefix" type="text" value="WR1800K">
+          </div>
+        </div>
+        <div id="lan-wrap">
+          <label>LAN address <span class="hint">ap mode only; off the upstream subnet</span></label>
+          <input id="lan_ipaddr" type="text" value="192.168.9.1">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Power control <span class="hint">optional; both set = flasher auto power-cycles</span></legend>
+        <label>Power-off command</label>
+        <input id="power_off_cmd" type="text" placeholder="ssh plughost ./plug off 1">
+        <label>Power-on command</label>
+        <input id="power_on_cmd" type="text" placeholder="ssh plughost ./plug on 1">
+      </fieldset>
+    </form>
+
+    <div class="out">
+      <pre id="preview"></pre>
+      <button id="download">Download creds.json</button>
+      <button id="copy" class="sec">Copy</button>
+      <p class="warn" id="copy-msg"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var ids = ['mode','backhaul','root_password','ssh_authorized_keys','main_ssid','ap_ssid',
+    'wifi_password','wifi_encryption','backhaul_band','country','hostname_prefix','lan_ipaddr',
+    'power_off_cmd','power_on_cmd'];
+
+  function build() {
+    var mode = $('mode').value;
+    var backhaul = $('backhaul').value;
+    var wireless = mode === 'bridge' && (backhaul === 'relayd' || backhaul === 'wds' || backhaul === 'proxy');
+
+    // conditional visibility
+    $('bh-wrap').hidden = mode !== 'bridge';
+    $('lan-wrap').hidden = mode !== 'ap';
+    $('band-wrap').hidden = !wireless;
+    $('main-ssid-wrap').hidden = !(wireless || mode === 'ap');
+    $('main-ssid-label').textContent = mode === 'ap' ? 'SSID to broadcast' : 'Upstream SSID to join';
+
+    var keys = $('ssh_authorized_keys').value.split('\n')
+      .map(function (s) { return s.trim(); }).filter(Boolean);
+
+    // warnings
+    $('login-warn').textContent =
+      (!$('root_password').value && keys.length === 0)
+        ? 'Set a root password or at least one SSH key, or the flasher will refuse.' : '';
+    var pw = $('wifi_password').value;
+    $('wifi-warn').textContent = (wireless || mode === 'ap') && pw && pw.length < 8
+      ? 'Wi-Fi password must be at least 8 characters.' : '';
+
+    // assemble in the schema's field order
+    var o = {};
+    o.mode = mode;
+    if (mode === 'bridge') o.backhaul = backhaul;
+    o.root_password = $('root_password').value;
+    o.ssh_authorized_keys = keys;
+    if (wireless || mode === 'ap') {
+      o.main_ssid = $('main_ssid').value;
+      o.ap_ssid = $('ap_ssid').value;
+      o.wifi_password = pw;
+      o.wifi_encryption = $('wifi_encryption').value;
+    }
+    if (wireless) o.backhaul_band = $('backhaul_band').value;
+    o.country = $('country').value;
+    o.hostname_prefix = $('hostname_prefix').value;
+    if (mode === 'ap') o.lan_ipaddr = $('lan_ipaddr').value;
+    o.power_off_cmd = $('power_off_cmd').value;
+    o.power_on_cmd = $('power_on_cmd').value;
+
+    $('preview').textContent = JSON.stringify(o, null, 2);
+    return o;
+  }
+
+  ids.forEach(function (id) {
+    var el = $(id);
+    el.addEventListener('input', build);
+    el.addEventListener('change', build);
+  });
+
+  $('download').addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify(build(), null, 2) + '\n'], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'creds.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  $('copy').addEventListener('click', function () {
+    var text = JSON.stringify(build(), null, 2);
+    navigator.clipboard.writeText(text).then(
+      function () { $('copy-msg').textContent = 'Copied.'; setTimeout(function(){ $('copy-msg').textContent=''; }, 1500); },
+      function () { $('copy-msg').textContent = 'Copy failed; select the text manually.'; }
+    );
+  });
+
+  build();
+})();
+</script>
+</body>
+</html>
