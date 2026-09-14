@@ -25,8 +25,9 @@ plus `jq openssl curl tar zstd tftp-hpa openssh sshpass nc tcpdump iproute2`.
 - [docs/development.md](docs/development.md): repo layout, bench testing.
 - [docs/backlog.md](docs/backlog.md): open questions.
 
-The `proxy` backhaul needs the per-client proxy STA daemon from the
-`openwrt-pstad` repository, included here as the `psta/` submodule:
-`git submodule update --init`.
+The `proxy` backhaul needs the per-client proxy STA daemon from
+[openwrt-pstad](https://github.com/jbroll/openwrt-pstad), included here as the
+`psta/` submodule: `git submodule update --init`. That repo explains why a
+plain station cannot bridge and how one association per client gets around it.
 
 MIT licensed. See [LICENSE](LICENSE).
