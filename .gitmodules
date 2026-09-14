@@ -1,0 +1,3 @@
+[submodule "psta"]
+	path = psta
+	url = ../openwrt-pstad
