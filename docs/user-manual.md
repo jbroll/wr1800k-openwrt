@@ -4,6 +4,7 @@
 
 ```sh
 sudo ./flash-wr1800k.sh [creds.json] <wired-iface>
+./flash-wr1800k.sh [creds.json] build
 ```
 
 `creds.json` defaults to `./creds.json`. The wired interface is required and
@@ -11,6 +12,11 @@ must be cabled to a LAN port on the router. The script builds the credentialed
 image, arms TFTP recovery on the host, power-cycles the router (prompting for a
 manual unplug/replug, or running `power_off_cmd`/`power_on_cmd` if configured),
 flashes NAND over SSH, and verifies. It prints the device address and hostname.
+
+With `build` in place of the interface it stops after the image is built and
+prints its path under `build/`. That needs no root and no cable, and is the way
+to refresh the image after a change to `provision.sh` or the `psta/` submodule;
+apply it to a running unit with `sysupgrade` over SSH or by the recovery flash.
 
 Keep real credentials in `creds.local.json` (or any `*.local.json`), which is
 gitignored. The `build/` tree is gitignored too: it holds the ImageBuilder, the

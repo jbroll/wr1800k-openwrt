@@ -46,7 +46,9 @@ The bench loop:
 2. Cable the wired NIC straight into a LAN port. No switch shared with a live
    `192.168.1.0/24`.
 3. `sudo ./flash-wr1800k.sh creds.local.json <iface>`. The ImageBuilder is
-   downloaded once into `build/` and reused.
+   downloaded once into `build/` and reused. `./flash-wr1800k.sh
+   creds.local.json build` runs only the build step, for checking the overlay
+   under `build/files/` and the package manifest without touching a unit.
 4. Read the `RESULT` block. `overlay: ubifs-overlay` means NAND; anything else
    means the unit is still on the RAM image or the previous firmware.
 5. Log in on `lan_ipaddr` with the flasher's key (`ssh -i build/id_flash

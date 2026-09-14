@@ -13,7 +13,8 @@ U-Boot's TFTP recovery, writes the credentialed image to NAND over SSH, and
 verifies. No serial console is needed for the automated path.
 
 ```sh
-sudo ./flash-wr1800k.sh creds.json eth0
+sudo ./flash-wr1800k.sh creds.json eth0     # build and flash over the wire
+./flash-wr1800k.sh creds.json build         # build only, no root needed
 ```
 
 Requirements: a Linux host with a wired NIC cabled to a LAN port on the router,

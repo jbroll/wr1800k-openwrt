@@ -11,8 +11,10 @@
 # verifies over SSH (key-based) and prints the device's address and mDNS name.
 #
 # Usage:  sudo ./flash-wr1800k.sh [creds.json] <wired-iface>
+#         ./flash-wr1800k.sh [creds.json] build
 #   creds.json    credentials file            (default: ./creds.json)
 #   wired-iface   host NIC cabled to a LAN port on the router (required)
+#   build         build the image only and print its path; no sudo, no NIC
 #
 # The only manual step is one power-cycle of the router when prompted.
 #
@@ -37,14 +39,16 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o Connect
 # ---- args ----
 CREDS="${1:-creds.json}"
 IFACE="${2:-}"
-[ -n "$IFACE" ] || { echo "usage: sudo $0 [creds.json] <wired-iface>" >&2; exit 2; }
+[ -n "$IFACE" ] || { echo "usage: sudo $0 [creds.json] <wired-iface>|build" >&2; exit 2; }
 [ -f "$CREDS" ]  || { echo "creds file not found: $CREDS" >&2; exit 2; }
-ip link show "$IFACE" >/dev/null 2>&1 || { echo "no such interface: $IFACE" >&2; exit 2; }
+BUILD_ONLY=0; [ "$IFACE" = build ] && BUILD_ONLY=1
+[ "$BUILD_ONLY" = 1 ] || ip link show "$IFACE" >/dev/null 2>&1 || { echo "no such interface: $IFACE" >&2; exit 2; }
 
 msg() { printf '\n=== %s ===\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing dependency: $1"; }
-for c in jq openssl curl tar zstd in.tftpd ssh ssh-keygen sshpass nc ip; do need "$c"; done
+for c in jq openssl curl tar zstd ssh-keygen; do need "$c"; done
+[ "$BUILD_ONLY" = 1 ] || for c in in.tftpd ssh sshpass nc ip; do need "$c"; done
 
 SUDO="sudo"; [ "$(id -u)" = 0 ] && SUDO=""
 
@@ -99,7 +103,7 @@ cleanup() {
 	[ "$VHOST_ADDED" = 1 ] && $SUDO ip addr del "${LAN_IPADDR%.*}.254/24" dev "$IFACE" 2>/dev/null || true
 	[ "$NM_UNMANAGED" = 1 ] && $SUDO nmcli device set "$IFACE" managed yes 2>/dev/null || true
 }
-trap cleanup EXIT
+[ "$BUILD_ONLY" = 1 ] || trap cleanup EXIT
 
 # =====================================================================
 msg "1/5  build credentialed image"
@@ -198,6 +202,7 @@ fi
 SYSUP=$(ls "$IB_NAME"/bin/targets/ramips/mt7621/*sim_simax1800t-squashfs-sysupgrade.bin 2>/dev/null | head -1)
 [ -n "$SYSUP" ] && [ -f "$SYSUP" ] || die "sysupgrade image not produced"
 echo "built: $SYSUP"
+[ "$BUILD_ONLY" = 1 ] && exit 0
 
 INITRAMFS="$WORK/initramfs.bin"
 [ -f "$INITRAMFS" ] || curl -fL -o "$INITRAMFS" \
