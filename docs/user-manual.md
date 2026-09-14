@@ -79,7 +79,10 @@ The first-boot logic lives in `provision.sh`; the flasher bakes the
     `/etc/psta/allow` defaults to `*`, meaning all clients.
 
 In `bridge` mode the device joins the upstream LAN by DHCP, so it is not
-reachable on the isolated recovery wire.
+reachable on the isolated recovery wire. It runs no DHCPv4 server, and
+`dhcp.lan.ra` and `dhcp.lan.dhcpv6` are `disabled`, so it sends no IPv6 router
+advertisements. Left at OpenWrt's defaults, odhcpd would hand LAN clients
+addresses from the unit's own ULA prefix even with `dhcp.lan.ignore` set.
 
 ## Reaching the device by name
 

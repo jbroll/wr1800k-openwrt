@@ -74,11 +74,18 @@ set_all_aps() {
 		uci set wireless.$ifc.key="$KEY"; uci set wireless.$ifc.network='lan'
 	done
 }
+# ignore only stops the DHCPv4 server; odhcpd would still send router
+# advertisements and serve DHCPv6 from the unit's ULA prefix onto the LAN.
+set_no_lan_servers() {
+	uci set dhcp.lan.ignore='1'
+	uci set dhcp.lan.ra='disabled'
+	uci set dhcp.lan.dhcpv6='disabled'
+}
 # LAN joins the upstream subnet as a DHCP client, no local DHCP server
 set_lan_upstream_dhcp() {
 	uci set network.lan.proto='dhcp'
 	uci -q delete network.lan.ipaddr; uci -q delete network.lan.netmask; uci -q delete network.lan.gateway
-	uci set dhcp.lan.ignore='1'
+	set_no_lan_servers
 }
 
 # 3-address STA on its own wwan interface, upstream reached at L3 through
@@ -90,7 +97,7 @@ set_station_and_aps() {
 	uci -q delete network.lan.ipaddr
 	uci -q delete network.lan.netmask
 	uci -q delete network.lan.gateway
-	uci set dhcp.lan.ignore='1'
+	set_no_lan_servers
 	uci set network.wwan='interface'; uci set network.wwan.proto='dhcp'
 	uci set wireless.wwan='wifi-iface'
 	uci set wireless.wwan.device="$BH_RADIO"; uci set wireless.wwan.mode='sta'
