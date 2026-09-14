@@ -33,6 +33,9 @@
 MAC=$(tr -d ':' < /sys/class/net/eth0/address)
 MACSUF=$(printf '%s' "$MAC" | tail -c 6)
 uci set system.@system[0].hostname="${PREFIX}-${MACSUF}"
+# The default 64-128 KiB buffer rolled over in about three hours on a busy
+# repeater, taking the start of a pstad fault with it.
+uci set system.@system[0].log_size='1024'
 uci commit system
 
 # AP_SSID may carry a {mac} token, expanded here to this unit's MAC suffix so a

@@ -183,6 +183,8 @@ sed -i "s#^root:[^:]*:#root:${ROOT_HASH}:#" /etc/shadow
 PREFIX='WR1800K'
 MAC=$(tr -d ':' < /sys/class/net/eth0/address)
 uci set system.@system[0].hostname="${PREFIX}-$(printf '%s' "$MAC" | tail -c 6)"
+# 1 MiB of logread; the default rolls over in hours on a busy repeater
+uci set system.@system[0].log_size='1024'
 uci commit system
 
 # --- Wi-Fi ---
