@@ -191,9 +191,10 @@ fi
 chmod 600 "$FILES/etc/dropbear/authorized_keys"
 
 # proxy ships pstad instead of relayd, plus tc/bridge tooling the daemon shells
-# out to for per-client MAC handling; every other backhaul keeps relayd.
+# out to for per-client MAC handling and tcpdump for its roam monitor; every
+# other backhaul keeps relayd.
 if [ "$BACKHAUL" = proxy ]; then
-	PACKAGES="umdns luci tc-full kmod-sched-core kmod-sched-flower ip-bridge"
+	PACKAGES="umdns luci tc-full kmod-sched-core kmod-sched-flower ip-bridge tcpdump-mini"
 else
 	PACKAGES="umdns relayd luci"
 fi

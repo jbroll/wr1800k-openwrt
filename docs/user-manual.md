@@ -226,8 +226,9 @@ make image PROFILE=sim_simax1800t FILES=files/ PACKAGES="umdns relayd luci"
 ```
 
 A `proxy`-backhaul image needs `tc` and its kernel modules instead of relayd,
-and the `psta/` overlay: `PACKAGES="umdns luci tc-full kmod-sched-core
-kmod-sched-flower ip-bridge"`. `flash-wr1800k.sh` selects that package set and
+`tcpdump-mini` for pstad's roam monitor, and the `psta/` overlay:
+`PACKAGES="umdns luci tc-full kmod-sched-core kmod-sched-flower ip-bridge
+tcpdump-mini"`. `flash-wr1800k.sh` selects that package set and
 overlay automatically from `backhaul: "proxy"` in `creds.json`.
 
 The build writes to `bin/targets/ramips/mt7621/`:
