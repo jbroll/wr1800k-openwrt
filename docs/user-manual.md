@@ -53,7 +53,14 @@ only mode the flasher can verify over the recovery wire.
 **bridge** is an extender that puts clients on the upstream subnet. The LAN
 gets its address from upstream by DHCP, runs no DHCPv4 server, and has router
 advertisements and DHCPv6 disabled, so odhcpd does not hand out addresses
-from the unit's own ULA prefix. `backhaul` picks the uplink:
+from the unit's own ULA prefix. dnsmasq's DNS listener is off as well
+(`dhcp.@dnsmasq[0].port='0'`), because clients get their resolver from the
+upstream router and a bridge unit sits on the same subnet as every other host,
+so its resolver would answer them all. The unit resolves through
+`/tmp/resolv.conf.d/resolv.conf.auto`, which `/etc/resolv.conf` is symlinked
+to: netifd leaves `/etc/resolv.conf` pointing at `127.0.0.1` when the port
+goes to 0, and without the symlink the unit cannot resolve names for `opkg`
+or NTP. `backhaul` picks the uplink:
 
 | Backhaul | Uplink | Clients upstream | Hostname lookup from the LAN |
 |---|---|---|---|

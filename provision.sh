@@ -79,10 +79,16 @@ set_all_aps() {
 }
 # ignore only stops the DHCPv4 server; odhcpd would still send router
 # advertisements and serve DHCPv6 from the unit's ULA prefix onto the LAN.
+# dnsmasq serves DNS from the same daemon, so it keeps answering the upstream
+# subnet the unit sits on even with DHCP off. netifd does not repoint
+# /etc/resolv.conf when the port goes to 0, so do it here or the unit loses
+# name resolution for opkg and NTP.
 set_no_lan_servers() {
 	uci set dhcp.lan.ignore='1'
 	uci set dhcp.lan.ra='disabled'
 	uci set dhcp.lan.dhcpv6='disabled'
+	uci set dhcp.@dnsmasq[0].port='0'
+	ln -sf /tmp/resolv.conf.d/resolv.conf.auto /etc/resolv.conf
 }
 # LAN joins the upstream subnet as a DHCP client, no local DHCP server
 set_lan_upstream_dhcp() {
