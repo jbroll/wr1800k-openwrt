@@ -3,7 +3,7 @@
 # flash-wr1800k.sh: build a credentialed OpenWrt image for the Fenvi WR1800K
 # (MediaTek MT7621, OpenWrt sim_simax1800t profile) and flash it via the stock
 # U-Boot network-boot path. See docs/architecture.md for background and
-# docs/user-manual.md for the manual flow.
+# docs/user-manual.md for flashing by hand.
 #
 # Reads credentials from creds.json, builds a sysupgrade image with the root
 # password (optional), SSH authorized keys, Wi-Fi, hostname/mDNS name and umdns
@@ -19,7 +19,7 @@
 # The only manual step is one power-cycle of the router when prompted.
 #
 # Assumes the stock initramfs allows passwordless root over SSH (standard on a
-# fresh OpenWrt). If it does not, use the serial method in docs/user-manual.md.
+# fresh OpenWrt). If it does not, flash by hand: see docs/user-manual.md.
 
 set -euo pipefail
 

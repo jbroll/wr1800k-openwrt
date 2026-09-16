@@ -1,75 +1,52 @@
 # Quickstart
 
-## Hardware
+## You need
 
-- The WR1800K and its own power adapter.
-- A wired Ethernet interface on the host (built-in NIC or USB adapter) and a
-  cable into one of the router's LAN ports.
-- Optional: a USB-to-TTL serial adapter with 3.3 V logic. The automated path
-  does not need it; it is for watching the boot or for recovery. The MT7621
-  UART is 3.3 V and a 5 V adapter can damage it. See the user manual for wiring.
+- The WR1800K and its power adapter.
+- A Linux host with a wired NIC, cabled straight to a LAN port on the router.
+- On the host: `jq openssl curl tar zstd xz tftp-hpa openssh sshpass nc tcpdump
+  iptables iproute2`. The flasher checks for most of them at start and stops at
+  the first one missing.
+- For a `proxy` backhaul: `git submodule update --init`.
 
-## Host packages
+A serial adapter is optional. See the
+[user manual](user-manual.md#serial-console).
 
-`jq`, `openssl`, `curl`, `tar`, `zstd`, `in.tftpd` (from `tftp-hpa`), `ssh`,
-`ssh-keygen`, `sshpass`, `nc`, `ip`, `tcpdump`. The ImageBuilder needs a normal
-Linux build host with `xz` as well. The flasher checks for each and stops at the
-first one missing.
+## Write creds.json
 
-## Fill in creds.json
+Copy `creds.json` to `creds.local.json` and edit it, or fill in
+`config-builder.html` in a browser and save the result. The minimum is a login
+(`root_password` or `ssh_authorized_keys`), `main_ssid`, and a `wifi_password`
+of 8 or more characters.
 
-Copy `creds.json` to `creds.local.json` (gitignored) and edit it, or open
-`config-builder.html` in a browser: it shows only the fields each mode needs,
-warns on the common mistakes (no login set, short Wi-Fi key), and downloads a
-matching file. The fields are listed in the [user manual](user-manual.md).
+Use `"mode": "ap"` for a first flash. It is the only mode the flasher can
+verify over the wire.
 
-The minimum is one login (`root_password` or `ssh_authorized_keys`), an SSID
-and an 8+ character `wifi_password`.
+## Isolate the link
 
-For a first bench flash use `"mode": "ap"`. That is the only mode the flasher
-can verify over the recovery wire, and the unit comes up on `lan_ipaddr`
-(default `192.168.9.1`) where you can log in and check it.
+During network boot, U-Boot uses a fixed address on `192.168.1.0/24`. On a
+segment bridged to a live network of that range, it collides with other hosts
+and the transfer fails, and no host-side routing fixes that. Connect the host
+directly to the router, or through a switch that goes nowhere else. The link
+needs to be isolated only during the flash.
 
-## Flash on an isolated link
+If the host brings up a VPN automatically when its network changes, turn that
+off for the flash. A VPN's `192.168.1.0/24` route hides the router, and the
+flash fails with `initramfs never network-booted`.
 
-During network-boot the router's U-Boot uses a fixed per-unit IP on
-`192.168.1.0/24` and TFTPs over that one interface. Run the flash on a
-point-to-point link: the host's wired NIC straight into a LAN port on the
-router, or a switch that is not bridged to a live LAN. On a live
-`192.168.1.0/24` the U-Boot's fixed IP collides with existing hosts and DHCP and
-its brief TFTP is disrupted. That is an L2 conflict no host-side routing can
-fix; one unit failed every attempt on a bridged segment and flashed on the first
-try once isolated. Only the network-boot minute needs the isolation. A deployed
-bridge runs over its backhaul afterwards.
-
-If the host runs a VPN dispatcher keyed on the default route, disable it for
-the duration. The flasher churns the routing table and puts a second box on
-`192.168.1.1`; a dispatcher that reads "away" from that will bring a VPN up and
-its `192.168.1.0/24` route swallows the LAN, including any host that runs
-`power_off_cmd`/`power_on_cmd`. The flash then fails at "initramfs never
-network-booted" looking like a TFTP problem.
-
-## Run it
+## Flash
 
 ```sh
 sudo ./flash-wr1800k.sh creds.local.json eth0
 ```
 
-The flasher downloads the ImageBuilder on first use (into `build/`), builds the
-image, sets up the host NIC and TFTP server, and then asks you to power-cycle
-the router (or does it itself when `power_off_cmd` and `power_on_cmd` are set).
-Unplug the router's power and plug it back in. U-Boot fetches `factory.bin`,
-RAM-boots the stock initramfs, and the flasher pushes the credentialed image
-and runs `sysupgrade`.
+The flasher downloads the ImageBuilder on first use, builds the image, and
+prompts you to unplug the router's power and plug it back in. If the router
+boots its old firmware instead, it asks again, up to six times.
 
-If the wired link does not renegotiate before U-Boot's short TFTP window the
-router boots its old firmware instead. The flasher notices (passwordless root
-SSH only works on the stock initramfs) and asks for another power-cycle, up to
-six tries.
+## Check the result
 
-## What success looks like
-
-In `ap` mode the flasher waits for the unit on `lan_ipaddr` and prints:
+In `ap` mode it ends with:
 
 ```
 === RESULT ===
@@ -82,15 +59,12 @@ Wi-Fi ifaces up:  2
 umdns:            running
 root password set:yes   (SSH key auth: yes)
 address (bench):  192.168.9.1
-mDNS name:        WR1800K-0a1b2c.local
+mDNS name:        WR1800K-0a1b2c.local   (after deployment: ssh root@WR1800K-0a1b2c.local)
 ```
 
-`overlay: ubifs-overlay` is the line that matters: it means the unit booted
-from NAND, not from the RAM image.
+`overlay: ubifs-overlay` means the unit booted from NAND. Log in with
+`ssh root@192.168.9.1`.
 
-In `bridge` mode the unit joins the upstream network by DHCP and is not
-reachable on the recovery wire, so the flasher prints how to find it on the
-upstream LAN and exits. See "Reaching the device by name" in the user manual.
-
-All host-side changes (NetworkManager state, addresses, routes, firewall rule,
-TFTP server) are reverted when the script exits.
+In `bridge` mode the unit joins the upstream network and is not reachable over
+the wire. The flasher prints how to find it there. See
+[Modes](user-manual.md#modes).

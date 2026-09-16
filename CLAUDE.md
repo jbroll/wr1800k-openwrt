@@ -19,9 +19,9 @@ U-Boot and its recovery path. This repository is public.
 | `psta/` | Submodule (`openwrt-pstad`) holding `pstad` and `pstad.init` for the `proxy` backhaul |
 | `backup/` | Where bootloader MTD dumps go; the dumps themselves are gitignored |
 | `docs/quickstart.md` | Shortest path to a flashed unit |
-| `docs/user-manual.md` | Fields, modes, manual walkthrough, environment overrides |
-| `docs/architecture.md` | Host-side mechanics, U-Boot environment findings, TFTP exposure, recovery |
-| `docs/development.md` | Layout, bench loop, provisioning header |
+| `docs/user-manual.md` | Fields, modes, environment overrides, flashing by hand, bootloader backups |
+| `docs/architecture.md` | Host-side mechanics, U-Boot findings, TFTP exposure, recovery, flash layout |
+| `docs/development.md` | Layout, provisioning header, bench loop |
 | `docs/backlog.md` | Open items |
 
 ## Conventions

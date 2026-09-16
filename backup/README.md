@@ -1,15 +1,12 @@
 # Bootloader backups
 
-Raw MTD dumps pulled from a running unit before editing the U-Boot
-environment. Named `<mac-suffix>-mtd<n>-<partition>.bin`. The `.bin` files are
-gitignored; this directory is where they go, not a copy of them.
+MTD dumps taken from a unit before changing its U-Boot environment, named
+`<mac-suffix>-mtd<n>-<partition>.bin`. Git ignores the `.bin` files.
 
-| Partition | Size | Contents |
+| File | Size | Partition |
 |---|---|---|
-| `mtd0` | 0x80000 | `u-boot`, the bootloader itself |
-| `mtd1` | 0x80000 | `u-boot-env`, single env copy, no redundant second copy |
+| `*-mtd0-u-boot.bin` | 0x80000 | The bootloader |
+| `*-mtd1-u-boot-env.bin` | 0x80000 | The environment |
 
-`mtd1` has no backup copy on the device, so an interrupted `fw_setenv` leaves
-nothing to fall back on. Restore from here with `mtd write <file> u-boot-env`.
-
-Do not write `mtd0` on a unit without a working serial console.
+How to take and restore them is in
+[docs/user-manual.md](../docs/user-manual.md#bootloader-backups).
