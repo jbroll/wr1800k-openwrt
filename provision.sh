@@ -145,6 +145,7 @@ if [ "$MODE" = bridge ]; then
 		# defensive/idempotent in case that symlink is ever missing.
 		set_station_and_aps
 		/etc/init.d/pstad enable 2>/dev/null
+		/etc/init.d/wwan-watchdog enable 2>/dev/null
 		;;
 	*)
 		# relayd (default) wireless backhaul: a plain 3-address STA on its own wwan
@@ -154,6 +155,7 @@ if [ "$MODE" = bridge ]; then
 		# the STA at L3 and anchors on the STA's DHCP lease. Manage the repeater
 		# through that lease, resolvable by hostname on the upstream router.
 		set_station_and_aps
+		/etc/init.d/wwan-watchdog enable 2>/dev/null
 		;;
 	esac
 else

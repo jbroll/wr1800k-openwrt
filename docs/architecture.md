@@ -5,11 +5,12 @@
 `flash-wr1800k.sh` installs OpenWrt in two steps:
 
 1. **Build.** The OpenWrt ImageBuilder makes a `sim_simax1800t` sysupgrade
-   image. Its overlay holds `/etc/uci-defaults/99-provision`, which is
-   `provision.sh` with the `creds.json` values prepended. OpenWrt runs it once
-   on first boot and then deletes it. The overlay also carries SSH keys, umdns
-   service records, and either the relayd hotplug script or `pstad`, depending
-   on the backhaul.
+ image. Its overlay holds `/etc/uci-defaults/99-provision`, which is
+ `provision.sh` with the `creds.json` values prepended. OpenWrt runs it once
+ on first boot and then deletes it. The overlay also carries SSH keys, umdns
+ service records, and either the relayd hotplug script or `pstad`, depending
+ on the backhaul. STA backhauls (`relayd`, `proxy`) also carry a wwan watchdog
+ that bounces a silently disassociated station.
 2. **Flash.** The stock U-Boot network-boots the stock OpenWrt initramfs over
    TFTP. The flasher copies the built image to it over SSH and runs
    `sysupgrade`, which writes NAND.

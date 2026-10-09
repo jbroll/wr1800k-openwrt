@@ -1,0 +1,46 @@
+#!/bin/sh
+# wwan-watchdog: bounces the wwan STA when netifd reports it up but the radio
+# reports no association. netifd tracks the netdev and its DHCP lease, not
+# 802.11 state, so a STA that loses its association without the driver
+# delivering DISCONNECTED keeps its lease and route forever: no hotplug event
+# fires, the supplicant sits idle, and the bridge stays dark. Seen Oct 2026, a
+# proxy unit dark 32 h with a live lease and a silent supplicant.
+#
+# Ships on relayd and proxy builds, the two backhauls with a wwan STA. pstad
+# already detects the condition each sweep but has no mechanism to kick the
+# STA; this closes that loop.
+
+CHECK=${WWAN_CHECK:-60}
+REQUIRE=${WWAN_REQUIRE:-3}
+DOWN=0
+
+log() { logger -t wwan-watchdog "$*"; }
+
+backhaul() { ls /sys/class/net | grep -m1 -- '-sta[0-9]*$'; }
+
+wwan_up() { ubus call network.interface.wwan status 2>/dev/null | grep -q '"up": true'; }
+
+linked() { iw dev "$1" link 2>/dev/null | grep -q '^Connected to'; }
+
+bounce() {  # IFACE
+	ifdown wwan
+	sleep 5
+	ifup wwan
+	log "wwan up but $1 unassociated, bounced wwan"
+}
+
+check() {
+	bh=$(backhaul) || return 0
+	wwan_up || { DOWN=0; return 0; }
+	if linked "$bh"; then
+		DOWN=0
+		return 0
+	fi
+	DOWN=$(( DOWN + 1 ))
+	[ "$DOWN" -ge "$REQUIRE" ] && { bounce "$bh"; DOWN=0; }
+	return 0
+}
+
+[ -n "$WWAN_LIB" ] && return 0
+
+while sleep "$CHECK"; do check; done

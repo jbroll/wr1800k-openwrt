@@ -84,6 +84,11 @@ upstream router registers in its DNS.
 [openwrt-pstad](https://github.com/jbroll/openwrt-pstad) README explains the
 trade-off with relayd.
 
+`relayd` and `proxy` also ship a wwan watchdog. netifd tracks the station's
+netdev and lease, not its association, so a silently dropped station otherwise
+stays dark with nothing retrying. After three straight unassociated minutes the
+watchdog bounces `wwan`, which reassociates and rebuilds clients.
+
 ## Environment overrides
 
 | Variable | Default | Effect |

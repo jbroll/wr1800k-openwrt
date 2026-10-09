@@ -9,6 +9,8 @@
 | `config-builder.html` | Static page that writes a `creds.json` |
 | `creds.json` | Template. Real credentials go in `*.local.json`, which git ignores |
 | `psta/` | Submodule of `openwrt-pstad`, copied into `proxy` images |
+| `wwan-watchdog`, `wwan-watchdog.init` | STA watchdog daemon and procd init, POSIX sh. Copied into `relayd` and `proxy` images |
+| `tests/` | Stub-based shell tests, `sh tests/test-wwan-watchdog.sh` |
 | `backup/` | Bootloader dumps. `*.bin` is ignored |
 | `build/` | Created by the flasher: ImageBuilder, `files/` overlay, `tftproot/`, `initramfs.bin`, `id_flash` key. Ignored |
 
@@ -26,9 +28,11 @@ variable list at the top of `provision.sh`.
 
 ## Testing
 
-There are no automated tests. Check the scripts with `sh -n` and `shellcheck`.
-The remaining shellcheck notes are SC2086 on deliberate word splitting of
-`uci` paths and `$SSH_OPTS`, and the unused `HEXLEN`.
+`sh tests/test-wwan-watchdog.sh` runs the watchdog tests, which stub `iw`,
+`ubus` and `ifup` as shell functions. Check the scripts with `sh -n` and
+`shellcheck`. The remaining shellcheck notes are SC2086 on deliberate word
+splitting of `uci` paths and `$SSH_OPTS`, SC2010 on the `ls | grep` backhaul
+lookup shared with `pstad`, and the unused `HEXLEN`.
 
 To inspect an image without a router, run
 `./flash-wr1800k.sh creds.local.json build` and look at `build/files/` and the

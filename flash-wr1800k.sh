@@ -184,6 +184,19 @@ if [ "$BACKHAUL" = proxy ]; then
 	ln -sf ../init.d/pstad "$FILES/etc/rc.d/S99pstad"
 fi
 
+# wwan watchdog for STA backhauls: netifd tracks the wwan netdev and its DHCP
+# lease, not 802.11 state, so a STA that loses its association without the
+# driver delivering DISCONNECTED keeps its lease forever and the bridge stays
+# dark with nothing retrying. The watchdog bounces wwan after three straight
+# unassociated checks. Inert without a 'wwan' iface (ap/wired/wds builds).
+if [ "$BACKHAUL" = relayd ] || [ "$BACKHAUL" = proxy ]; then
+	cp "$SRCDIR/wwan-watchdog" "$FILES/usr/sbin/wwan-watchdog"
+	cp "$SRCDIR/wwan-watchdog.init" "$FILES/etc/init.d/wwan-watchdog"
+	chmod +x "$FILES/usr/sbin/wwan-watchdog" "$FILES/etc/init.d/wwan-watchdog"
+	mkdir -p "$FILES/etc/rc.d"
+	ln -sf ../init.d/wwan-watchdog "$FILES/etc/rc.d/S99wwan-watchdog"
+fi
+
 # SSH access: the script's own ephemeral key (for key-based verify) plus any keys
 # supplied in creds.json, baked into root's dropbear authorized_keys.
 [ -f "$AUTOKEY" ] || ssh-keygen -q -t ed25519 -N '' -C flash-wr1800k -f "$AUTOKEY"
