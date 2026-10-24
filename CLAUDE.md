@@ -16,7 +16,10 @@ U-Boot and its recovery path. This repository is public.
 | `provision.sh` | First-boot `uci-defaults` logic; the flasher prepends a header of `creds.json` values |
 | `config-builder.html` | Browser form that writes a `creds.json` |
 | `creds.json` | Template with placeholder values |
-| `psta/` | Submodule (`openwrt-pstad`) holding `pstad` and `pstad.init` for the `proxy` backhaul |
+| `psta/` | Submodule (`openwrt-pstad`) holding `pstad` and `pstad.init` for the `proxy` and `auto` backhauls |
+| `backhaul-auto`, `backhaul-auto.init` | `auto` backhaul daemon: wired while a LAN port reaches DHCP, `pstad` otherwise |
+| `wwan-watchdog`, `wwan-watchdog.init` | Bounces a silently disassociated STA on `relayd`, `proxy` and `auto` units |
+| `tests/` | Stub-based shell tests for the two daemons |
 | `backup/` | Where bootloader MTD dumps go; the dumps themselves are gitignored |
 | `docs/quickstart.md` | Shortest path to a flashed unit |
 | `docs/user-manual.md` | Fields, modes, environment overrides, flashing by hand, bootloader backups |

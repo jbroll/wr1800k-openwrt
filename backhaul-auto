@@ -1,0 +1,109 @@
+#!/bin/sh
+# backhaul-auto: picks the uplink on backhaul=auto units. While a wired LAN port
+# reaches a DHCP server the unit is a plain wired AP; otherwise it joins
+# upstream over Wi-Fi with pstad. pstad must never run with a wire into the
+# upstream LAN: the bridge loops and pstad clones every upstream host's MAC.
+
+CHECK=${AUTO_CHECK:-30}
+REQUIRE=${AUTO_REQUIRE:-3}
+PSTAD=${AUTO_PSTAD:-/etc/init.d/pstad}
+FAILS=0
+STATE=
+BH_AP=
+
+log() { logger -t backhaul-auto "$*"; }
+
+wired_ports() {
+	for p in /sys/class/net/br-lan/brif/*; do
+		p=${p##*/}
+		[ -e "/sys/class/net/$p/phy80211" ] || [ "$p" = '*' ] || echo "$p"
+	done
+}
+
+carrier() {
+	for p in $(wired_ports); do
+		[ "$(cat "/sys/class/net/$p/carrier" 2>/dev/null)" = 1 ] && return 0
+	done
+	return 1
+}
+
+# Only run while br-lan is proto none, so netifd has no udhcpc of its own there.
+# br-lan is not bridged to the station, so an answer can only come over a wire.
+dhcp_offer() { udhcpc -i br-lan -n -q -f -t 3 -T 2 -s /bin/true >/dev/null 2>&1; }
+
+gateway() {
+	ubus call network.interface.lan status 2>/dev/null |
+		jsonfilter -e '@.route[@.target="0.0.0.0"].nexthop'
+}
+
+wired_ok() {
+	carrier || return 1
+	gw=$(gateway)
+	[ -n "$gw" ] || return 1
+	ping -c1 -W2 "$gw" >/dev/null 2>&1
+}
+
+backhaul_ap() {
+	dev=$(uci -q get wireless.wwan.device)
+	uci show wireless | sed -n "s/^wireless\.\(default_radio[0-9]*\)\.device='$dev'$/\1/p"
+}
+
+to_wired() {
+	"$PSTAD" stop
+	uci set wireless.wwan.disabled='1'
+	[ -n "$BH_AP" ] && uci set "wireless.$BH_AP.disabled=0"
+	uci set network.lan.proto='dhcp'
+	uci commit wireless
+	uci commit network
+	reload_config
+	STATE=wired
+	FAILS=0
+	log "DHCP server on a wired port, switched to the wired backhaul"
+}
+
+to_proxy() {
+	uci set wireless.wwan.disabled='0'
+	[ -n "$BH_AP" ] && uci set "wireless.$BH_AP.disabled=1"
+	uci set network.lan.proto='none'
+	uci commit wireless
+	uci commit network
+	reload_config
+	"$PSTAD" start
+	STATE=proxy
+	FAILS=0
+	log "no wired upstream, switched to the proxy backhaul"
+}
+
+check() {
+	if [ "$STATE" = wired ]; then
+		if wired_ok; then
+			FAILS=0
+			return 0
+		fi
+		FAILS=$(( FAILS + 1 ))
+		[ "$FAILS" -ge "$REQUIRE" ] && to_proxy
+	else
+		carrier && dhcp_offer && to_wired
+	fi
+	return 0
+}
+
+start() {
+	BH_AP=$(backhaul_ap)
+	if [ "$(uci -q get network.lan.proto)" = dhcp ]; then
+		STATE=wired
+	elif carrier && dhcp_offer; then
+		to_wired
+	else
+		STATE=proxy
+		"$PSTAD" start
+	fi
+}
+
+[ -n "$AUTO_LIB" ] && return 0
+
+# Gives the switch ports time to negotiate, so a wire present at boot is seen
+# before pstad starts.
+sleep 10
+start
+while sleep "$CHECK"; do check; done

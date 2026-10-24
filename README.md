@@ -10,10 +10,11 @@ design, and the `sim_simax1800t` profile runs the switch, both radios and the
 settings included, network-boots OpenWrt through the stock U-Boot's TFTP
 recovery, writes the image to NAND, and verifies it. No serial console is
 needed. The image can be a standalone router or an extender over a wired,
-WDS, relayd or per-client proxy STA backhaul.
+WDS, relayd or per-client proxy STA backhaul, or `auto`, which runs wired
+while a LAN port reaches the upstream router and proxy STA otherwise.
 
 ```sh
-sudo ./flash-wr1800k.sh creds.local.json eth0   # build and flash over the wire
+./flash-wr1800k.sh creds.local.json eth0   # build and flash over the wire
 ./flash-wr1800k.sh creds.local.json build       # build only
 ```
 

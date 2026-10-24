@@ -3,9 +3,15 @@
 ## The flasher
 
 ```sh
-sudo ./flash-wr1800k.sh [creds.json] <wired-iface>
+./flash-wr1800k.sh [creds.json] <wired-iface>
 ./flash-wr1800k.sh [creds.json] build
 ```
+
+Run it as yourself. It refuses to run as root, because a root run leaves
+`build/` owned by root. To flash, it asks for your sudo password once before
+building and keeps sudo's timestamp fresh until it exits. Only the host
+network steps use sudo: NIC addresses and routes, NetworkManager, `iptables`,
+`tcpdump` and `in.tftpd`.
 
 `creds.json` defaults to `./creds.json`. With an interface, the flasher builds
 the image, network-boots the router over that NIC, flashes NAND, and verifies.
@@ -29,7 +35,7 @@ mode uses and warns about common mistakes.
 | Field | Default | Purpose |
 |---|---|---|
 | `mode` | `ap` | `ap` or `bridge`. See [Modes](#modes) |
-| `backhaul` | `relayd` | `bridge` uplink: `relayd`, `proxy`, `wds` or `wired`. See [Modes](#modes) |
+| `backhaul` | `relayd` | `bridge` uplink: `relayd`, `proxy`, `auto`, `wds` or `wired`. See [Modes](#modes) |
 | `root_password` | | Root password. `""` disables password login |
 | `ssh_authorized_keys` | `[]` | Public keys for root. At least one of these or `root_password` is required |
 | `main_ssid` | | In `ap`, the SSID broadcast. With a wireless backhaul, the upstream network to join, and the SSID broadcast unless `ap_ssid` is set. Unused for `wired` |
@@ -68,6 +74,7 @@ or NTP. `backhaul` picks the uplink:
 | `wds` | 4-address station bridged into the LAN. Needs an upstream AP that accepts 4-address frames, which most ISP routers do not | Own MACs | `<name>.local` |
 | `relayd` | 3-address station plus relayd | All share the station's MAC | `<name>` through the upstream router's DNS |
 | `proxy` | 3-address station plus `pstad`, one station per client, 18 clients at most | Own MACs | `<name>.local` |
+| `auto` | `wired` while a LAN port reaches a DHCP server, `proxy` otherwise | Own MACs | `<name>.local` |
 
 With a wireless backhaul, the `backhaul_band` radio joins `main_ssid` and the
 other radio broadcasts.
@@ -84,7 +91,23 @@ upstream router registers in its DNS.
 [openwrt-pstad](https://github.com/jbroll/openwrt-pstad) README explains the
 trade-off with relayd.
 
-`relayd` and `proxy` also ship a wwan watchdog. netifd tracks the station's
+Never cable a `proxy` unit's LAN port into the upstream network. The bridge
+loops, `pstad` clones every upstream host's MAC as a station of its own, and
+the 18 slots fill with those clones, so the repeater's real clients get no
+upstream path. Use `auto` where a cable is sometimes there.
+
+`auto` ships `pstad` and `/usr/sbin/backhaul-auto`, which owns it. Every 30 s
+it checks the wired ports. In proxy mode, when one has carrier, it sends a
+DHCP discover on `br-lan`. `br-lan` is not bridged to the station, so an offer
+can only come over a wire. On an offer it stops `pstad`, disables the `wwan`
+station, turns on the backhaul radio's AP and sets `lan` to DHCP, the same
+configuration as `wired`. In wired mode, three straight checks with no carrier
+on any wired port, no lease or no ping reply from the gateway switch it back
+to proxy. A wired client with no DHCP server behind it, a laptop say, leaves
+the unit in proxy mode. The mode survives a reboot, and `logread -e
+backhaul-auto` shows each switch.
+
+`relayd`, `proxy` and `auto` also ship a wwan watchdog. netifd tracks the station's
 netdev and lease, not its association, so a silently dropped station otherwise
 stays dark with nothing retrying. After three straight unassociated minutes the
 watchdog bounces `wwan`, which reassociates and rebuilds clients.

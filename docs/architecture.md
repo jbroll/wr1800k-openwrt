@@ -9,8 +9,10 @@
  `provision.sh` with the `creds.json` values prepended. OpenWrt runs it once
  on first boot and then deletes it. The overlay also carries SSH keys, umdns
  service records, and either the relayd hotplug script or `pstad`, depending
- on the backhaul. STA backhauls (`relayd`, `proxy`) also carry a wwan watchdog
- that bounces a silently disassociated station.
+ on the backhaul. STA backhauls (`relayd`, `proxy`, `auto`) also carry a wwan
+ watchdog that bounces a silently disassociated station. `auto` adds
+ `backhaul-auto`, which starts `pstad` only while no wired port reaches a DHCP
+ server, because `pstad` with a wire into the upstream LAN loops the bridge.
 2. **Flash.** The stock U-Boot network-boots the stock OpenWrt initramfs over
    TFTP. The flasher copies the built image to it over SSH and runs
    `sysupgrade`, which writes NAND.

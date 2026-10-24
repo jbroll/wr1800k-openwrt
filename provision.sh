@@ -7,7 +7,7 @@
 # removed by OpenWrt. The prepended variables are:
 #
 #   MODE           ap | bridge
-#   BACKHAUL       bridge-mode uplink: relayd | wds | wired | proxy
+#   BACKHAUL       bridge-mode uplink: relayd | wds | wired | proxy | auto
 #   ROOT_HASH      sha-512 crypt of the root password, or "" (SSH-key only)
 #   PREFIX         hostname/mDNS prefix
 #   UPSTREAM_SSID  network to JOIN  (repeater backhaul)
@@ -25,6 +25,7 @@
 #     backhaul=relayd    3-address STA + relayd proxy-ARP/DHCP-relay; works with any AP (e.g. Verizon Fios)
 #     backhaul=wds       4-address WDS STA bridged into the LAN; needs a WDS-capable upstream
 #     backhaul=proxy     per-client proxy STA (pstad); drops relayd, each client keeps its own MAC upstream
+#     backhaul=auto      wired while a LAN port reaches a DHCP server, proxy otherwise (backhaul-auto)
 
 # --- root password (optional) ---
 [ -n "$ROOT_HASH" ] && sed -i "s#^root:[^:]*:#root:$ROOT_HASH:#" /etc/shadow
@@ -59,22 +60,19 @@ done
 
 AP_IFACES=$(uci show wireless | sed -n "s/^wireless\.\(default_radio[0-9]*\)=wifi-iface/\1/p")
 
-# rebroadcast AP on the non-backhaul radio only; the backhaul radio's own AP off
-set_repeater_aps() {
-	for ifc in $AP_IFACES; do
-		if [ "$(uci -q get wireless.$ifc.device)" = "$BH_RADIO" ]; then
-			uci set wireless.$ifc.disabled='1'
-		else
-			uci set wireless.$ifc.ssid="$AP_SSID"; uci set wireless.$ifc.encryption="$ENC"
-			uci set wireless.$ifc.key="$KEY"; uci set wireless.$ifc.network='lan'
-		fi
-	done
-}
 # AP on every radio, bridged to lan
 set_all_aps() {
 	for ifc in $AP_IFACES; do
 		uci set wireless.$ifc.ssid="$AP_SSID"; uci set wireless.$ifc.encryption="$ENC"
 		uci set wireless.$ifc.key="$KEY"; uci set wireless.$ifc.network='lan'
+	done
+}
+# rebroadcast AP on the non-backhaul radio only. The backhaul radio's AP is
+# configured but off, so backhaul-auto can turn it on for the wired backhaul.
+set_repeater_aps() {
+	set_all_aps
+	for ifc in $AP_IFACES; do
+		[ "$(uci -q get wireless.$ifc.device)" = "$BH_RADIO" ] && uci set wireless.$ifc.disabled='1'
 	done
 }
 # ignore only stops the DHCPv4 server; odhcpd would still send router
@@ -146,6 +144,14 @@ if [ "$MODE" = bridge ]; then
 		set_station_and_aps
 		/etc/init.d/pstad enable 2>/dev/null
 		/etc/init.d/wwan-watchdog enable 2>/dev/null
+		;;
+	auto)
+		# starts as proxy; backhaul-auto switches to wired while a LAN port
+		# reaches a DHCP server, and owns pstad, which has no rc.d link here
+		set_station_and_aps
+		/etc/init.d/pstad disable 2>/dev/null
+		/etc/init.d/wwan-watchdog enable 2>/dev/null
+		/etc/init.d/backhaul-auto enable 2>/dev/null
 		;;
 	*)
 		# relayd (default) wireless backhaul: a plain 3-address STA on its own wwan

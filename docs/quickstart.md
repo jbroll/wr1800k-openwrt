@@ -7,7 +7,7 @@
 - On the host: `jq openssl curl tar zstd xz tftp-hpa openssh sshpass nc tcpdump
   iptables iproute2`. The flasher checks for most of them at start and stops at
   the first one missing.
-- For a `proxy` backhaul: `git submodule update --init`.
+- For a `proxy` or `auto` backhaul: `git submodule update --init`.
 
 A serial adapter is optional. See the
 [user manual](user-manual.md#serial-console).
@@ -37,10 +37,11 @@ flash fails with `initramfs never network-booted`.
 ## Flash
 
 ```sh
-sudo ./flash-wr1800k.sh creds.local.json eth0
+./flash-wr1800k.sh creds.local.json eth0
 ```
 
-The flasher downloads the ImageBuilder on first use, builds the image, and
+Run it as yourself, not under `sudo`. It asks for your sudo password once, for
+the host network steps. The flasher downloads the ImageBuilder on first use, builds the image, and
 prompts you to unplug the router's power and plug it back in. If the router
 boots its old firmware instead, it asks again, up to six times.
 

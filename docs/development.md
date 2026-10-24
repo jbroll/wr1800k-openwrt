@@ -4,13 +4,14 @@
 
 | Path | Purpose |
 |---|---|
-| `flash-wr1800k.sh` | The flasher, bash, run with `sudo` |
+| `flash-wr1800k.sh` | The flasher, bash, run as your user. It calls `sudo` for the host network steps |
 | `provision.sh` | First-boot `uci-defaults` logic, POSIX sh for BusyBox ash |
 | `config-builder.html` | Static page that writes a `creds.json` |
 | `creds.json` | Template. Real credentials go in `*.local.json`, which git ignores |
-| `psta/` | Submodule of `openwrt-pstad`, copied into `proxy` images |
-| `wwan-watchdog`, `wwan-watchdog.init` | STA watchdog daemon and procd init, POSIX sh. Copied into `relayd` and `proxy` images |
-| `tests/` | Stub-based shell tests, `sh tests/test-wwan-watchdog.sh` |
+| `psta/` | Submodule of `openwrt-pstad`, copied into `proxy` and `auto` images |
+| `wwan-watchdog`, `wwan-watchdog.init` | STA watchdog daemon and procd init, POSIX sh. Copied into `relayd`, `proxy` and `auto` images |
+| `backhaul-auto`, `backhaul-auto.init` | Wired or proxy switcher and procd init, POSIX sh. Copied into `auto` images |
+| `tests/` | Stub-based shell tests, `sh tests/test-wwan-watchdog.sh` and `sh tests/test-backhaul-auto.sh` |
 | `backup/` | Bootloader dumps. `*.bin` is ignored |
 | `build/` | Created by the flasher: ImageBuilder, `files/` overlay, `tftproot/`, `initramfs.bin`, `id_flash` key. Ignored |
 
@@ -29,7 +30,9 @@ variable list at the top of `provision.sh`.
 ## Testing
 
 `sh tests/test-wwan-watchdog.sh` runs the watchdog tests, which stub `iw`,
-`ubus` and `ifup` as shell functions. Check the scripts with `sh -n` and
+`ubus` and `ifup` as shell functions. `sh tests/test-backhaul-auto.sh` runs
+the switcher tests, which stub `uci`, `udhcpc`, `ping` and the pstad init
+script through `AUTO_PSTAD`. Check the scripts with `sh -n` and
 `shellcheck`. The remaining shellcheck notes are SC2086 on deliberate word
 splitting of `uci` paths and `$SSH_OPTS`, SC2010 on the `ls | grep` backhaul
 lookup shared with `pstad`, and the unused `HEXLEN`.
@@ -44,7 +47,7 @@ On a bench unit:
    `WR1800K-test-{mac}`, so nothing roams onto the unit and two bench units do
    not collide.
 2. Cable the NIC straight to a LAN port.
-3. Run `sudo ./flash-wr1800k.sh creds.local.json <iface>`. The ImageBuilder in
+3. Run `./flash-wr1800k.sh creds.local.json <iface>`. The ImageBuilder in
    `build/` is reused between runs.
 4. Check `overlay: ubifs-overlay` in the `RESULT` block.
 5. Log in with `ssh -i build/id_flash root@192.168.9.1` and check

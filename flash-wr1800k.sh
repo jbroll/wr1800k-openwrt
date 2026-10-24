@@ -10,11 +10,14 @@
 # baked in, RAM-boots the stock initramfs over TFTP, sysupgrades onto NAND, then
 # verifies over SSH (key-based) and prints the device's address and mDNS name.
 #
-# Usage:  sudo ./flash-wr1800k.sh [creds.json] <wired-iface>
+# Usage:  ./flash-wr1800k.sh [creds.json] <wired-iface>
 #         ./flash-wr1800k.sh [creds.json] build
 #   creds.json    credentials file            (default: ./creds.json)
 #   wired-iface   host NIC cabled to a LAN port on the router (required)
 #   build         build the image only and print its path; no sudo, no NIC
+#
+# Run as yourself, not under sudo. The few host-network steps call sudo
+# themselves; the password is asked for once, before the build.
 #
 # The only manual step is one power-cycle of the router when prompted.
 #
@@ -39,7 +42,9 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o Connect
 # ---- args ----
 CREDS="${1:-creds.json}"
 IFACE="${2:-}"
-[ -n "$IFACE" ] || { echo "usage: sudo $0 [creds.json] <wired-iface>|build" >&2; exit 2; }
+[ -n "$IFACE" ] || { echo "usage: $0 [creds.json] <wired-iface>|build" >&2; exit 2; }
+# under sudo, build/ and its files end up root-owned and the next build cannot clear them
+[ "$(id -u)" != 0 ] || { echo "run as yourself, not root; the script calls sudo where it must" >&2; exit 2; }
 [ -f "$CREDS" ]  || { echo "creds file not found: $CREDS" >&2; exit 2; }
 BUILD_ONLY=0; [ "$IFACE" = build ] && BUILD_ONLY=1
 [ "$BUILD_ONLY" = 1 ] || ip link show "$IFACE" >/dev/null 2>&1 || { echo "no such interface: $IFACE" >&2; exit 2; }
@@ -50,7 +55,15 @@ need() { command -v "$1" >/dev/null 2>&1 || die "missing dependency: $1"; }
 for c in jq openssl curl tar zstd ssh-keygen; do need "$c"; done
 [ "$BUILD_ONLY" = 1 ] || for c in in.tftpd ssh sshpass nc ip; do need "$c"; done
 
-SUDO="sudo"; [ "$(id -u)" = 0 ] && SUDO=""
+SUDO="sudo"
+SUDO_KEEPALIVE=""
+if [ "$BUILD_ONLY" = 0 ]; then
+	sudo -v || die "sudo is needed for the network-boot steps"
+	# retried power cycles can outlast sudo's timeout, and the background U-Boot
+	# sniffer cannot prompt
+	( while kill -0 $$ 2>/dev/null && sudo -n true 2>/dev/null; do sleep 60; done ) &
+	SUDO_KEEPALIVE=$!
+fi
 
 WORK="$(cd "$(dirname "$0")" && pwd)/build"
 TFTPROOT="$WORK/tftproot"
@@ -67,7 +80,7 @@ PREFIX=$(jq -r '.hostname_prefix // "WR1800K"' "$CREDS")
 ENC=$(jq -r '.wifi_encryption // "sae-mixed"' "$CREDS")
 LAN_IPADDR=$(jq -r '.lan_ipaddr // "192.168.9.1"' "$CREDS")   # flashed LAN; non-overlapping with a typical home 192.168.1.0/24
 MODE=$(jq -r '.mode // "ap"' "$CREDS")                        # ap | bridge
-BACKHAUL=$(jq -r '.backhaul // "relayd"' "$CREDS")            # bridge uplink: relayd | wds | wired | proxy
+BACKHAUL=$(jq -r '.backhaul // "relayd"' "$CREDS")            # bridge uplink: relayd | wds | wired | proxy | auto
 BACKHAUL_BAND=$(jq -r '.backhaul_band // "5"' "$CREDS")       # 2 or 5 (GHz) radio for a wireless backhaul (relayd/wds/proxy)
 SSH_KEYS=$(jq -r '(.ssh_authorized_keys // []) | if type=="array" then join("\n") else tostring end' "$CREDS")
 [ "$SSH_KEYS" = null ] && SSH_KEYS=""
@@ -79,7 +92,9 @@ POWER_ON_CMD="${POWER_ON_CMD:-$(jq -r '.power_on_cmd // ""' "$CREDS")}"
 [ "$POWER_OFF_CMD" = null ] && POWER_OFF_CMD=""
 [ "$POWER_ON_CMD" = null ] && POWER_ON_CMD=""
 case "$MODE" in ap|bridge) ;; *) die "mode must be ap or bridge (got: $MODE)";; esac
-case "$BACKHAUL" in relayd|wds|wired|proxy) ;; *) die "backhaul must be relayd, wds, wired or proxy (got: $BACKHAUL)";; esac
+case "$BACKHAUL" in relayd|wds|wired|proxy|auto) ;; *) die "backhaul must be relayd, wds, wired, proxy or auto (got: $BACKHAUL)";; esac
+# auto runs pstad whenever it is not wired, so it ships everything proxy does
+PSTA_BUILD=0; case "$BACKHAUL" in proxy|auto) PSTA_BUILD=1;; esac
 if [ "$MODE" = bridge ] && [ "$BACKHAUL" != wired ]; then
 	{ [ -n "$MAIN_SSID" ] && [ "$MAIN_SSID" != null ]; } || die "wireless backhaul ($BACKHAUL) needs main_ssid (the upstream network to join)"
 fi
@@ -102,6 +117,7 @@ cleanup() {
 	$SUDO ip addr del "$HOST_RECOVERY_IP/32" dev "$IFACE" 2>/dev/null || true
 	[ "$VHOST_ADDED" = 1 ] && $SUDO ip addr del "${LAN_IPADDR%.*}.254/24" dev "$IFACE" 2>/dev/null || true
 	[ "$NM_UNMANAGED" = 1 ] && $SUDO nmcli device set "$IFACE" managed yes 2>/dev/null || true
+	[ -n "$SUDO_KEEPALIVE" ] && kill "$SUDO_KEEPALIVE" 2>/dev/null || true
 }
 [ "$BUILD_ONLY" = 1 ] || trap cleanup EXIT
 
@@ -155,9 +171,9 @@ UMDNS
 # is how repeater clients get an upstream-subnet address). br-lan carries no IP
 # of its own; relayd anchors on the STA's DHCP lease, so nothing is hand-picked and nothing can collide with
 # the upstream pool. The upstream gateway is .1 of the lease's subnet. Inert in
-# ap/wired/wds mode (no 'wwan' iface). Not shipped in a proxy build: pstad
-# replaces relayd there, and the two must not both be running.
-if [ "$BACKHAUL" != proxy ]; then
+# ap/wired/wds mode (no 'wwan' iface). Not shipped in a proxy or auto build:
+# pstad replaces relayd there, and the two must not both be running.
+if [ "$PSTA_BUILD" = 0 ]; then
 	cat > "$FILES/etc/hotplug.d/iface/99-relayd" <<'HOTPLUG'
 #!/bin/sh
 [ "$ACTION" = ifup ] && [ "$INTERFACE" = wwan ] || exit 0
@@ -175,13 +191,21 @@ fi
 # keeps its own MAC upstream. Allowlist wide open (image-side; access control
 # is the upstream network's job); the service symlink enables it at first boot.
 # psta/ is the openwrt-pstad submodule: git submodule update --init
-if [ "$BACKHAUL" = proxy ]; then
+# In an auto build backhaul-auto starts and stops pstad, so pstad gets no link.
+if [ "$PSTA_BUILD" = 1 ]; then
 	cp "$SRCDIR/psta/pstad" "$FILES/usr/sbin/pstad"
 	cp "$SRCDIR/psta/pstad.init" "$FILES/etc/init.d/pstad"
 	chmod +x "$FILES/usr/sbin/pstad" "$FILES/etc/init.d/pstad"
 	echo '*' > "$FILES/etc/psta/allow"
 	mkdir -p "$FILES/etc/rc.d"
-	ln -sf ../init.d/pstad "$FILES/etc/rc.d/S99pstad"
+	if [ "$BACKHAUL" = auto ]; then
+		cp "$SRCDIR/backhaul-auto" "$FILES/usr/sbin/backhaul-auto"
+		cp "$SRCDIR/backhaul-auto.init" "$FILES/etc/init.d/backhaul-auto"
+		chmod +x "$FILES/usr/sbin/backhaul-auto" "$FILES/etc/init.d/backhaul-auto"
+		ln -sf ../init.d/backhaul-auto "$FILES/etc/rc.d/S99backhaul-auto"
+	else
+		ln -sf ../init.d/pstad "$FILES/etc/rc.d/S99pstad"
+	fi
 fi
 
 # wwan watchdog for STA backhauls: netifd tracks the wwan netdev and its DHCP
@@ -189,7 +213,7 @@ fi
 # driver delivering DISCONNECTED keeps its lease forever and the bridge stays
 # dark with nothing retrying. The watchdog bounces wwan after three straight
 # unassociated checks. Inert without a 'wwan' iface (ap/wired/wds builds).
-if [ "$BACKHAUL" = relayd ] || [ "$BACKHAUL" = proxy ]; then
+if [ "$BACKHAUL" = relayd ] || [ "$PSTA_BUILD" = 1 ]; then
 	cp "$SRCDIR/wwan-watchdog" "$FILES/usr/sbin/wwan-watchdog"
 	cp "$SRCDIR/wwan-watchdog.init" "$FILES/etc/init.d/wwan-watchdog"
 	chmod +x "$FILES/usr/sbin/wwan-watchdog" "$FILES/etc/init.d/wwan-watchdog"
@@ -206,7 +230,7 @@ chmod 600 "$FILES/etc/dropbear/authorized_keys"
 # proxy ships pstad instead of relayd, plus tc/bridge tooling the daemon shells
 # out to for per-client MAC handling and tcpdump for its roam monitor; every
 # other backhaul keeps relayd.
-if [ "$BACKHAUL" = proxy ]; then
+if [ "$PSTA_BUILD" = 1 ]; then
 	PACKAGES="umdns luci tc-full kmod-sched-core kmod-sched-flower ip-bridge tcpdump-mini"
 else
 	PACKAGES="umdns relayd luci"
@@ -377,13 +401,14 @@ else
 	case "$BACKHAUL" in
 	wired) printf 'backhaul: wired. Plug the uplink into a LAN port\n' ;;
 	proxy) printf 'backhaul: joins "%s" over Wi-Fi (proxy STA), rebroadcasts "%s"\n' "$MAIN_SSID" "$WIFI_SSID" ;;
-	*)     printf 'backhaul: joins "%s" over Wi-Fi (%s), rebroadcasts "%s"\n' "$MAIN_SSID" "$BACKHAUL" "$WIFI_SSID" ;;
+	auto)  printf 'backhaul: wired while a LAN port reaches a DHCP server, else joins "%s" (proxy STA)\n' "$MAIN_SSID" ;;
+	*)    printf 'backhaul: joins "%s" over Wi-Fi (%s), rebroadcasts "%s"\n' "$MAIN_SSID" "$BACKHAUL" "$WIFI_SSID" ;;
 	esac
 	printf 'clients:  lease from the upstream router; every device gets an upstream-subnet address\n'
 	case "$BACKHAUL" in
 	relayd) printf 'find it:  ssh root@%s-<last 3 MAC bytes>. The upstream router resolves the\n' "$PREFIX"
 	        printf '          hostname to the STA lease (no static mgmt IP); LuCI answers there too\n' ;;
-	proxy)  printf 'find it:  %s-<last 3 MAC bytes>.local via mDNS on the "%s" network. Proxy STA gives\n' "$PREFIX" "$MAIN_SSID"
+	proxy|auto) printf 'find it:  %s-<last 3 MAC bytes>.local via mDNS on the "%s" network. Proxy STA gives\n' "$PREFIX" "$MAIN_SSID"
 	        printf '          each client its own MAC upstream, so mDNS resolves everywhere (unlike relayd)\n' ;;
 	*)      printf 'find it:  %s-<last 3 MAC bytes>.local via mDNS on the "%s" network\n' "$PREFIX" "$MAIN_SSID" ;;
 	esac

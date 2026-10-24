@@ -56,6 +56,7 @@
           <select id="backhaul">
             <option value="relayd">relayd: wireless, any router, all hosts share the repeater's MAC upstream</option>
             <option value="proxy">proxy: wireless, any router, each host keeps its own MAC; 18 clients max</option>
+            <option value="auto">auto: wired when a LAN port reaches the router, proxy otherwise</option>
             <option value="wds">wds: wireless 4-address, needs a WDS-capable upstream</option>
             <option value="wired">wired: Ethernet/coax into a LAN port</option>
           </select>
@@ -147,7 +148,7 @@
   function build() {
     var mode = $('mode').value;
     var backhaul = $('backhaul').value;
-    var wireless = mode === 'bridge' && (backhaul === 'relayd' || backhaul === 'wds' || backhaul === 'proxy');
+    var wireless = mode === 'bridge' && (backhaul === 'relayd' || backhaul === 'wds' || backhaul === 'proxy' || backhaul === 'auto');
 
     // conditional visibility
     $('bh-wrap').hidden = mode !== 'bridge';
@@ -158,6 +159,7 @@
     $('bh-hint').textContent = {
       relayd: 'Simplest. Port forwards, Wake-on-LAN, PXE and IPv6 neighbour discovery cannot tell hosts behind the repeater apart.',
       proxy: 'One station per client on the backhaul radio (pstad). Hosts keep their identity upstream. One association slot per client, 18 on MT7915.',
+      auto: 'Wired while a LAN port reaches a DHCP server, proxy when it does not. Checked every 30 s; falls back to proxy after three failed checks.',
       wds: 'Only if the upstream accepts 4-address frames. Most ISP routers do not.',
       wired: 'A plain layer-2 access point. Use it wherever a cable reaches.'
     }[backhaul];
