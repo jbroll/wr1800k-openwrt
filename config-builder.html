@@ -159,7 +159,7 @@
     $('bh-hint').textContent = {
       relayd: 'Simplest. Port forwards, Wake-on-LAN, PXE and IPv6 neighbour discovery cannot tell hosts behind the repeater apart.',
       proxy: 'One station per client on the backhaul radio (pstad). Hosts keep their identity upstream. One association slot per client, 18 on MT7915.',
-      auto: 'Wired while a LAN port reaches a DHCP server, proxy when it does not. Checked every 30 s; falls back to proxy after three failed checks.',
+      auto: 'Wired while a LAN port reaches a DHCP server, proxy when it does not. A port is probed when it gains carrier; wired falls back to proxy after three failed 30 s checks.',
       wds: 'Only if the upstream accepts 4-address frames. Most ISP routers do not.',
       wired: 'A plain layer-2 access point. Use it wherever a cable reaches.'
     }[backhaul];

@@ -10,6 +10,7 @@ PSTAD=${AUTO_PSTAD:-/etc/init.d/pstad}
 FAILS=0
 STATE=
 BH_AP=
+UP=
 
 log() { logger -t backhaul-auto "$*"; }
 
@@ -20,9 +21,21 @@ wired_ports() {
 	done
 }
 
-carrier() {
+up_ports() {
 	for p in $(wired_ports); do
-		[ "$(cat "/sys/class/net/$p/carrier" 2>/dev/null)" = 1 ] && return 0
+		[ "$(cat "/sys/class/net/$p/carrier" 2>/dev/null)" = 1 ] && echo "$p"
+	done
+}
+
+carrier() { [ -n "$(up_ports)" ]; }
+
+# True when a wired port has gained carrier since the last call.
+new_carrier() {
+	now=$(up_ports | tr '\n' ' ')
+	last=$UP
+	UP=$now
+	for p in $now; do
+		case " $last " in *" $p "*) ;; *) return 0 ;; esac
 	done
 	return 1
 }
@@ -82,14 +95,22 @@ check() {
 		fi
 		FAILS=$(( FAILS + 1 ))
 		[ "$FAILS" -ge "$REQUIRE" ] && to_proxy
-	else
-		carrier && dhcp_offer && to_wired
+	elif new_carrier; then
+		# Once pstad has cloned the gateway, its port rule sends the gateway's
+		# frames up the clone's station, and the offer never reaches br-lan.
+		"$PSTAD" stop
+		if dhcp_offer; then
+			to_wired
+		else
+			"$PSTAD" start
+		fi
 	fi
 	return 0
 }
 
 start() {
 	BH_AP=$(backhaul_ap)
+	new_carrier
 	if [ "$(uci -q get network.lan.proto)" = dhcp ]; then
 		STATE=wired
 	elif carrier && dhcp_offer; then

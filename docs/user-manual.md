@@ -97,14 +97,20 @@ the 18 slots fill with those clones, so the repeater's real clients get no
 upstream path. Use `auto` where a cable is sometimes there.
 
 `auto` ships `pstad` and `/usr/sbin/backhaul-auto`, which owns it. Every 30 s
-it checks the wired ports. In proxy mode, when one has carrier, it sends a
-DHCP discover on `br-lan`. `br-lan` is not bridged to the station, so an offer
-can only come over a wire. On an offer it stops `pstad`, disables the `wwan`
+it checks the wired ports. In proxy mode, when a port gains carrier, it stops
+`pstad` and sends a DHCP discover on `br-lan`. `pstad` has to stop first: once
+it has cloned the gateway's MAC, its rule on the port sends the gateway's
+frames, offer included, up the clone's station. `br-lan` is not bridged to the
+station, so an offer can only come over a wire. With no offer it starts
+`pstad` again. On an offer it disables the `wwan`
 station, turns on the backhaul radio's AP and sets `lan` to DHCP, the same
 configuration as `wired`. In wired mode, three straight checks with no carrier
 on any wired port, no lease or no ping reply from the gateway switch it back
 to proxy. A wired client with no DHCP server behind it, a laptop say, leaves
-the unit in proxy mode. The mode survives a reboot, and `logread -e
+the unit in proxy mode after one `pstad` restart, and is not probed again until
+its port loses and regains carrier. A port that already has carrier when its
+far end gains an uplink, such as a switch that is cabled upstream later, is
+not seen until the port drops. The mode survives a reboot, and `logread -e
 backhaul-auto` shows each switch.
 
 `relayd`, `proxy` and `auto` also ship a wwan watchdog. netifd tracks the station's

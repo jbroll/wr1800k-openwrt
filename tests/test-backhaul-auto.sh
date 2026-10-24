@@ -30,14 +30,14 @@ sleep() { return 0; }
 AUTO_LIB=1; AUTO_PSTAD=pstad_stub; . "$D/backhaul-auto"
 
 # the script defines these, so their stubs go after it
-carrier() { [ "$STUB_CARRIER" = 1 ]; }
+up_ports() { [ "$STUB_CARRIER" = 1 ] && echo lan3; return 0; }
 gateway() { echo "$STUB_GW"; }
 
 ok() {  # NAME GOT WANT
 	if [ "$2" = "$3" ]; then PASS=$(( PASS + 1 )); else FAIL=$(( FAIL + 1 )); echo "FAIL: $1 (got $2, want $3)"; fi
 }
 
-proxy_state() { STATE=proxy; FAILS=0; PROTO=none; WWAN_DIS=0; AP_DIS=1; PSTAD_LAST=""; }
+proxy_state() { STATE=proxy; FAILS=0; PROTO=none; WWAN_DIS=0; AP_DIS=1; PSTAD_LAST=""; UP=""; }
 wired_state() { STATE=wired; FAILS=0; PROTO=dhcp; WWAN_DIS=1; AP_DIS=0; PSTAD_LAST=""; }
 
 # 1. backhaul_ap finds the AP on the station's radio
@@ -53,6 +53,18 @@ ok "proxy-no-carrier-stays" "$STATE" proxy
 proxy_state; STUB_CARRIER=1; STUB_OFFER=0
 check
 ok "proxy-client-only-stays" "$STATE" proxy
+ok "proxy-client-pstad-restarted" "$PSTAD_LAST" start
+
+# 3a. a carrier already seen is not probed again, so pstad is left alone
+PSTAD_LAST=""; STUB_OFFER=1
+check
+ok "steady-carrier-no-probe" "$STATE" proxy
+ok "steady-carrier-pstad-untouched" "$PSTAD_LAST" ""
+
+# 3b. the port dropping and returning is a new carrier and is probed
+STUB_CARRIER=0; check
+STUB_CARRIER=1; check
+ok "replug-probes" "$STATE" wired
 
 # 4. a DHCP offer on the wire switches to wired at once
 proxy_state; STUB_CARRIER=1; STUB_OFFER=1
