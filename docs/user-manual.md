@@ -91,10 +91,11 @@ upstream router registers in its DNS.
 [openwrt-pstad](https://github.com/jbroll/openwrt-pstad) README explains the
 trade-off with relayd.
 
-Never cable a `proxy` unit's LAN port into the upstream network. The bridge
-loops, `pstad` clones every upstream host's MAC as a station of its own, and
-the 18 slots fill with those clones, so the repeater's real clients get no
-upstream path. Use `auto` where a cable is sometimes there.
+Do not cable a `proxy` unit's LAN port into the upstream network. `pstad`
+detects such a port by the gateway's or the backhaul's MAC learned on it and
+stops proxying from it, rather than filling its 18 slots with clones of
+upstream hosts, but the unit still carries its Wi-Fi clients over the air
+beside a working wire. Use `auto` where a cable is sometimes there.
 
 `auto` ships `pstad` and `/usr/sbin/backhaul-auto`, which owns it. Every 30 s
 it checks the wired ports. In proxy mode, when a port gains carrier, it stops
