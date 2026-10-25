@@ -7,6 +7,9 @@
 CHECK=${AUTO_CHECK:-30}
 REQUIRE=${AUTO_REQUIRE:-3}
 PSTAD=${AUTO_PSTAD:-/etc/init.d/pstad}
+# Restarted on each switch: a busybox ntpd started before the uplink existed
+# ran for a day without setting the clock, and a restart synced in seconds.
+NTP=${AUTO_NTP:-/etc/init.d/sysntpd}
 FAILS=0
 STATE=
 BH_AP=
@@ -44,6 +47,13 @@ new_carrier() {
 # br-lan is not bridged to the station, so an answer can only come over a wire.
 dhcp_offer() { udhcpc -i br-lan -n -q -f -t 3 -T 2 -s /bin/true >/dev/null 2>&1; }
 
+# Once pstad has cloned the gateway, its port rule sends the gateway's frames up
+# the clone's station, and the offer never reaches br-lan.
+probe() {
+	"$PSTAD" stop
+	dhcp_offer
+}
+
 gateway() {
 	ubus call network.interface.lan status 2>/dev/null |
 		jsonfilter -e '@.route[@.target="0.0.0.0"].nexthop'
@@ -69,6 +79,7 @@ to_wired() {
 	uci commit wireless
 	uci commit network
 	reload_config
+	"$NTP" restart
 	STATE=wired
 	FAILS=0
 	log "DHCP server on a wired port, switched to the wired backhaul"
@@ -82,8 +93,12 @@ to_proxy() {
 	uci commit network
 	reload_config
 	"$PSTAD" start
+	"$NTP" restart
 	STATE=proxy
 	FAILS=0
+	# reload_config bounces the ports between polls, so a wire still present
+	# must count as new carrier or it is never probed again.
+	UP=
 	log "no wired upstream, switched to the proxy backhaul"
 }
 
@@ -96,10 +111,7 @@ check() {
 		FAILS=$(( FAILS + 1 ))
 		[ "$FAILS" -ge "$REQUIRE" ] && to_proxy
 	elif new_carrier; then
-		# Once pstad has cloned the gateway, its port rule sends the gateway's
-		# frames up the clone's station, and the offer never reaches br-lan.
-		"$PSTAD" stop
-		if dhcp_offer; then
+		if probe; then
 			to_wired
 		else
 			"$PSTAD" start
@@ -113,7 +125,7 @@ start() {
 	new_carrier
 	if [ "$(uci -q get network.lan.proto)" = dhcp ]; then
 		STATE=wired
-	elif carrier && dhcp_offer; then
+	elif carrier && probe; then
 		to_wired
 	else
 		STATE=proxy

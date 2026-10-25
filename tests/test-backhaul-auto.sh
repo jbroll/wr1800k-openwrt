@@ -22,12 +22,13 @@ uci() {
 	esac
 	return 0
 }
-pstad_stub() { PSTAD_LAST=$1; }
+pstad_stub() { PSTAD_LAST=$1; PSTAD_LOG="$PSTAD_LOG $1"; }
+ntp_stub() { NTP_LAST=$1; }
 reload_config() { return 0; }
 logger() { return 0; }
 sleep() { return 0; }
 
-AUTO_LIB=1; AUTO_PSTAD=pstad_stub; . "$D/backhaul-auto"
+AUTO_LIB=1; AUTO_PSTAD=pstad_stub; AUTO_NTP=ntp_stub; . "$D/backhaul-auto"
 
 # the script defines these, so their stubs go after it
 up_ports() { [ "$STUB_CARRIER" = 1 ] && echo lan3; return 0; }
@@ -74,6 +75,7 @@ ok "offer-stops-pstad" "$PSTAD_LAST" stop
 ok "offer-lan-dhcp" "$PROTO" dhcp
 ok "offer-station-off" "$WWAN_DIS" 1
 ok "offer-backhaul-ap-on" "$AP_DIS" 0
+ok "offer-ntp-restarted" "$NTP_LAST" restart
 
 # 5. a healthy wire keeps wired
 wired_state; STUB_CARRIER=1; STUB_PING=1
@@ -81,15 +83,26 @@ check; check; check
 ok "wired-healthy-stays" "$STATE" wired
 
 # 6. wired falls back to proxy only after REQUIRE straight failures
-wired_state; STUB_CARRIER=0
+wired_state; STUB_CARRIER=0; NTP_LAST=""
 check; check
 ok "wired-grace" "$STATE" wired
+ok "wired-grace-ntp-untouched" "$NTP_LAST" ""
 check
 ok "wired-third-fail-proxy" "$STATE" proxy
 ok "fallback-starts-pstad" "$PSTAD_LAST" start
 ok "fallback-lan-none" "$PROTO" none
 ok "fallback-station-on" "$WWAN_DIS" 0
 ok "fallback-backhaul-ap-off" "$AP_DIS" 1
+ok "fallback-ntp-restarted" "$NTP_LAST" restart
+
+# 6a. a wire still up after the fallback is probed, since reload_config bounces
+# the port faster than a poll can see
+wired_state; UP="lan3 "; STUB_CARRIER=1; STUB_PING=0; STUB_OFFER=0
+check; check; check
+ok "fallback-with-wire-proxy" "$STATE" proxy
+STUB_PING=1; STUB_OFFER=1
+check
+ok "fallback-wire-reprobed" "$STATE" wired
 
 # 7. a failure followed by recovery clears the count
 wired_state; STUB_CARRIER=1; STUB_PING=0
@@ -116,6 +129,12 @@ proxy_state; STATE=; STUB_CARRIER=1; STUB_OFFER=1
 start
 ok "start-wire-goes-wired" "$STATE" wired
 ok "start-wire-pstad-stopped" "$PSTAD_LAST" stop
+
+# 10a. a respawn with pstad still running stops it before probing
+proxy_state; STATE=; STUB_CARRIER=1; STUB_OFFER=0
+PSTAD_LOG=""
+start
+ok "start-probe-stops-pstad-first" "$PSTAD_LOG" " stop start"
 
 # 11. start on a proxy config with no wire starts pstad
 proxy_state; STATE=; STUB_CARRIER=0

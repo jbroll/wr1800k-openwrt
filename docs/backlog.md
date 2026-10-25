@@ -7,5 +7,9 @@
 - **Replace U-Boot with mainline.** It would fix the console and the TFTP
   exposure, but needs a tested SPL recovery first. See
   [Boot-time TFTP exposure](architecture.md#boot-time-tftp-exposure).
+- **Check NTP on a unit that boots into proxy and stays there.** One unit's
+  boot-time `ntpd` never set the clock in 22 hours, and a restart synced it in
+  seconds. `backhaul-auto` restarts `sysntpd` only on a switch, so a unit that
+  never switches is not covered.
 - **Remove `HEXLEN` from the flasher.** It is unused. `provision.sh` hard-codes
   the hostname suffix as `tail -c 6`.

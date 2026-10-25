@@ -106,7 +106,9 @@ station, so an offer can only come over a wire. With no offer it starts
 station, turns on the backhaul radio's AP and sets `lan` to DHCP, the same
 configuration as `wired`. In wired mode, three straight checks with no carrier
 on any wired port, no lease or no ping reply from the gateway switch it back
-to proxy. A wired client with no DHCP server behind it, a laptop say, leaves
+to proxy. A wire still up after that fallback is probed once at the next
+check. Each switch restarts `sysntpd`, whose `ntpd` otherwise kept the clock
+it had at boot. A wired client with no DHCP server behind it, a laptop say, leaves
 the unit in proxy mode after one `pstad` restart, and is not probed again until
 its port loses and regains carrier. A port that already has carrier when its
 far end gains an uplink, such as a switch that is cabled upstream later, is

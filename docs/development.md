@@ -31,8 +31,8 @@ variable list at the top of `provision.sh`.
 
 `sh tests/test-wwan-watchdog.sh` runs the watchdog tests, which stub `iw`,
 `ubus` and `ifup` as shell functions. `sh tests/test-backhaul-auto.sh` runs
-the switcher tests, which stub `uci`, `udhcpc`, `ping` and the pstad init
-script through `AUTO_PSTAD`. Check the scripts with `sh -n` and
+the switcher tests, which stub `uci`, `udhcpc`, `ping`, and the pstad and
+sysntpd init scripts through `AUTO_PSTAD` and `AUTO_NTP`. Check the scripts with `sh -n` and
 `shellcheck`. The remaining shellcheck notes are SC2086 on deliberate word
 splitting of `uci` paths and `$SSH_OPTS`, SC2010 on the `ls | grep` backhaul
 lookup shared with `pstad`, and the unused `HEXLEN`.
